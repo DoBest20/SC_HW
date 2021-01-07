@@ -71,7 +71,7 @@ _start:
         mov rdi, fmt
         mov rax, 0
         call scanf
-        call mlti
+        call muti
         call exit
         pop rbp
         ret

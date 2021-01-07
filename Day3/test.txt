@@ -1,13 +1,13 @@
 global _start
 
 section .bss
-buffer:     resb 128
+buffer:     resb 10
 res:        resb 10
 increase:   resb 10
 
 section .data
 equal:      db '=', 0
-multiple:        db '*', 0
+multiple:   db '*', 0
 end:        db 10, 0
 
 section .text
