@@ -1,0 +1,70 @@
+global _start
+
+section .bss
+buffer:     resb 128
+res:        resb 10
+increase:   resb 10
+
+section .data
+equal:      db '=', 0
+multiple:        db '*', 0
+end:        db 10, 0
+
+section .text
+
+printf: 
+        mov rdx, 2
+        mov rdi, 1
+        mov rax, 1
+        syscall
+        ret
+
+multi:
+        xor rax, rax
+        xor rbx, rbx
+        inc rax
+        inc rbx
+.loop:
+        mov rcx, 9
+        cmp rbx, rcx
+                jg .end
+        mov rax, rbx
+        mov rdi, [buffer]
+        mul rdi
+        mov [increase], rbx
+        mov [res], rax
+        call print_line
+
+        inc rbx
+        jmp .loop
+
+.end:
+        ret
+
+print_line:
+        mov rsi, [buffer]
+        call printf
+        mov rsi, multiple
+        call printf
+        mov rsi, increase
+        call printf
+        mov rsi, equal
+        call printf 
+        mov rsi, [res]
+        call printf
+        mov rsi, end
+        call printf
+        ret
+
+_start:
+        mov rsi, buffer
+        mov rax, rax
+        mov rdi, rax     
+        mov rdx, 2   
+        syscall
+
+        call multi
+        
+        mov rax, 60
+        mov rdi, 0
+        syscall

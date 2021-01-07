@@ -1,0 +1,42 @@
+global _start    
+section .bss
+    buffer:     resb 5
+    res:        resb 2
+    increase:   resb 2
+
+section .text
+
+printf:
+mov rdi, 1
+mov rax, 1
+mov rdx, 2
+syscall
+ret
+
+_start:
+
+mov rsi, buffer
+mov rax, rax
+mov rdi, rax
+mov rdx, 4
+syscall
+
+mov cl, [buffer]
+movzx rdi, cl
+sub rdi, 0x30
+
+mov rax, 2
+mul rdi
+ 
+add rax,0x30
+mov rsi, rax
+call printf
+
+mov rax, 60
+mov rdi, 0
+syscall
+
+section .data
+equal:      db '= ', 0
+multipl:    db '* ', 0
+end :       db 10, 0
